@@ -147,7 +147,72 @@ AI features return a clear error message (never fake answers) until Ollama is re
 | Port 5000 in use               | `set FLASK_PORT=5001` then restart `app.py`, and update the Vite proxy |
 | Blank page in browser          | Make sure both `python app.py` and `npm run dev` are running           |
 
-## Production build (optional)
+## Deploying to Render (backend) + Vercel (frontend)
+
+The repo is already wired for deployment:
+
+- `render.yaml` (repository root) — Render **Blueprint** that provisions the
+  Flask API automatically.
+- `frontend/vercel.json` — explicit Vite build settings for Vercel.
+
+**Important:** the AI engine is *your own Ollama on your PC*. Neither Render nor
+Vercel can run a 7B model for free, so the deployed backend reaches your machine
+through a free tunnel. No paid AI APIs are involved at any point.
+
+### 1. Deploy the backend to Render
+
+1. Open https://dashboard.render.com → **New +** → **Blueprint**.
+2. Connect your GitHub account and pick the `AI-Study-Companion` repository.
+   Render reads `render.yaml` and creates the `ai-study-companion-api` service.
+3. Wait for the first deploy to finish. Your API is now live at
+   `https://ai-study-companion-api-<random>.onrender.com` (find it on the service page).
+
+### 2. Point the backend at your Ollama (free tunnel)
+
+In a terminal on your PC (with the Ollama app running):
+
+```bat
+cloudflared tunnel --url http://localhost:11434
+```
+
+(Install cloudflared once from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+— or use `ngrok http 11434` instead.)
+
+Copy the `https://....trycloudflare.com` address it prints, then in Render:
+
+1. Open the `ai-study-companion-api` service → **Environment**.
+2. Set `OLLAMA_API_URL` to that HTTPS address → **Save** (the service redeploys).
+
+Each free-tunnel session gives a new address, so update this value whenever you
+restart the tunnel. While it is unset (or your PC is off), the app still works —
+it just shows the honest "Ollama is not running" banner instead of faking answers.
+
+### 3. Deploy the frontend to Vercel
+
+1. Open https://vercel.com/new → import the same GitHub repository.
+2. Vercel asks for the project root: set it to **`frontend`** (that folder holds
+   `package.json` and `vercel.json`).
+3. Before deploying, add an Environment Variable:
+   - Name: `VITE_API_URL`
+   - Value: your Render API URL from step 1 (e.g. `https://ai-study-companion-api-<random>.onrender.com`)
+4. Click **Deploy**. Your app is live at `https://<project>.vercel.app`.
+
+If you ever change the backend URL, update `VITE_API_URL` in Vercel and **redeploy**
+(it is baked in at build time).
+
+### Deployment limitations (honest list)
+
+- **Render free plan disk is ephemeral** — the SQLite `study.db` resets on
+  redeploys/restarts. Fine for trying it out; for real long-term progress
+  storage, upgrade Render or switch the backend to a managed database.
+- **Free plans spin down** when idle — the first request after a pause takes
+  ~30-60 seconds while the service wakes up.
+- **AI replies only flow while your PC's tunnel is up** and Ollama is running.
+  This is the trade-off of never using a paid AI API.
+- The tunnel URL is public — anyone who has it could use your Ollama. Quick
+  tunnels are random and short-lived; restart the tunnel if you suspect leaks.
+
+## Local production build (optional)
 
 ```bat
 cd frontend

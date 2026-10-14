@@ -23,7 +23,9 @@ OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "300"))
 
 # --- Server settings -------------------------------------------------------
 FLASK_HOST = os.environ.get("FLASK_HOST", "127.0.0.1")
-FLASK_PORT = int(os.environ.get("FLASK_PORT", "5000"))
+# Cloud platforms (Render, Heroku, ...) inject a PORT env var and expect the
+# app to bind to it, so prefer that when it is present.
+FLASK_PORT = int(os.environ.get("PORT") or os.environ.get("FLASK_PORT", "5000"))
 FLASK_DEBUG = os.environ.get("FLASK_DEBUG", "1") == "1"
 
 # --- Storage settings ------------------------------------------------------
